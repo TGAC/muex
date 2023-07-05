@@ -1,0 +1,139 @@
+# Muex v0.0.1
+# Kamil Hepak, Earlham Institute, 2023
+# MIT License
+
+##############
+### CONFIG ###
+##############
+
+# TODO write config
+# configfile: "config_muex.yaml"
+
+# TODO make bash script that symlinks everything correctly
+# CAPS = ["2","3","4","5","6","7"]
+# BARS = ["2","3","4","6","8","11","15"]
+CAPS = ["2"]
+BARS = ["11"] 
+
+# TODO make global variables for all filepaths that are used 2+ times
+# TODO make global variables (pull from config) for all parameters
+# TODO rule to aggregate all X_microexons.tsv files into big csv, like capybara does
+# TODO temp files / dirs
+
+#############
+### RULES ###
+#############
+
+rule all:
+    input: 
+        summary = expand("microexons/cap{cap}bar{bar}_microexons.tsv",cap=CAPS,bar=BARS),
+        fqc_html = expand("qc/cap{cap}bar{bar}_fastqc.html",cap=CAPS,bar=BARS),
+        fqc_zip = expand("qc/cap{cap}bar{bar}_fastqc.zip",cap=CAPS,bar=BARS),
+
+rule gen_microexons_full_summary:
+    output: 
+        summary = "microexons/{prefix}_microexons.tsv",
+    input: 
+        seqs = "info/{prefix}_microexons.fa",
+        supporting_info = "info/{prefix}_supporting_info.tsv",
+    params:
+        upflank = 2,
+        downflank = 2,
+    script: "gen_summary.py"
+
+rule extract_microexon_sequences:
+    output:
+        seqs = "info/{prefix}_microexons.fa",
+    input:
+        positions = "info/{prefix}_microexons_u2_d2.bed",
+        reference = "refs/genome_reference.fa",
+    shell: "bedtools getfasta -s -fi {input.reference} -fo {output.seqs} -nameOnly -bed {input.positions}"
+
+rule find_microexon_positions:
+    output:
+        positions = "info/{prefix}_microexons_u2_d2.bed", # TODO make u,d parametrised, pull from config
+        supporting_info = "info/{prefix}_supporting_info.tsv",
+    input:
+        alignment = "alignments/{prefix}_genome.bam",
+        reads_with_inserts = "inserts/{prefix}_reads_with_inserts.tsv",
+    params:
+        min_size = 6,
+        max_size = 21,
+        upflank = 2,
+        downflank = 2,
+        leeway = 0,
+    script: "find_positions.py"
+
+rule align_to_genome:
+    output:
+        alignment = "alignments/{prefix}_genome.bam",
+    input:
+        subset = "subsets/{prefix}_subset_full.fq", 
+        reference = "refs/genome_reference.fa",
+    params:
+        threads = 8,
+        G = 2000000, # TODO rename
+        B = 3,
+        O_1 = 3,
+        O_2 = 14,
+        k = 13,
+    shell: "minimap2 -t {params.threads} --cs --secondary=yes -G {params.G} -B{params.B} -O{params.O_1},{params.O_2} -k {params.k} -ax splice {input.reference} {input.subset} | samtools view -Sbo {output.alignment}"
+
+rule subset_reads:
+    output:
+        subset = "subsets/{prefix}_subset_full.fq", # TODO gzip? (don't forget to edit input of align_to_genome)
+    input: 
+        readnames = "inserts/{prefix}_reads_to_extract.txt",
+        alignments = "alignments/{prefix}_transcriptome.bam",
+    shell: # TODO split this apart into multiple rules
+        """ 
+        samtools view {input.alignments} | grep -Ff {input.readnames} > subsets/{wildcards.prefix}_subset_reads.sam
+        samtools view -H {input.alignments} > subsets/{wildcards.prefix}_alignment_header.txt
+        cat subsets/{wildcards.prefix}_alignment_header.txt subsets/{wildcards.prefix}_subset_reads.sam > subsets/{wildcards.prefix}_subset_full.sam
+        samtools fastq subsets/{wildcards.prefix}_subset_full.sam > {output.subset}
+        """
+
+rule find_reads_with_inserts:
+    output:
+        readnames = "inserts/{prefix}_reads_to_extract.txt",
+        reads_with_inserts = "inserts/{prefix}_reads_with_inserts.tsv",
+    input:
+        alignment = "alignments/{prefix}_transcriptome.bam",
+        transcript_dict = "refs/transcript_dict.pickle",
+    params:
+        min_size = 6,
+        max_size = 21,
+    script: "find_inserts.py"
+
+rule gen_transcript_dict:
+    output:
+        transcript_dict = "refs/transcript_dict.pickle",
+    input:
+        annotation = "refs/annotation.gtf",
+    script: "gen_dict.py"
+
+rule align_to_transcriptome:
+    output:
+        alignment = "alignments/{prefix}_transcriptome.bam",
+    input:
+        reads = "trimmed/{prefix}_trimmed.fq.gz",
+        reference = "refs/transcriptome_reference.fa",
+    params:
+        threads = 8,
+        k = 13, # TODO rename
+    shell: "minimap2 -t {params.threads} --cs --secondary=yes -k {params.k} -ax splice {input.reference} {input.reads} | samtools view -Sbo {output.alignment}"
+
+rule trim_reads:
+    output: 
+        trimmed = "trimmed/{prefix}_trimmed.fq.gz",
+    input: 
+        reads = "reads/{prefix}.fq",
+    shell: "trim_galore --gzip {input.reads} -o trimmed/" # TODO does this definitely gzip output files
+
+rule fastqc_reads:
+    output: 
+        html = "qc/{prefix}_fastqc.html",
+        zipfile = "qc/{prefix}_fastqc.zip",
+    input:
+        reads = "reads/{prefix}.fq", # TODO extension-agnostic
+    shell: "fastqc {input.reads} -o qc/"
