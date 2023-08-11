@@ -9,16 +9,13 @@
 # TODO write config
 # configfile: "config_muex.yaml"
 
-# TODO make bash script that symlinks everything correctly
-# CAPS = ["2","3","4","5","6","7"]
-# BARS = ["2","3","4","6","8","11","15"]
-CAPS = ["2"]
-BARS = ["11"] 
-
-# TODO make global variables for all filepaths that are used 2+ times
-# TODO make global variables (pull from config) for all parameters
+# TODO make config variables for all filepaths that are used 2+ times
+# TODO make config variables for all parameters
 # TODO rule to aggregate all X_microexons.tsv files into big csv, like capybara does
 # TODO temp files / dirs
+
+# TODO determine range (no of files in reads/) programmatically
+IDS = [f"{x}" for x in range(1)]
 
 #############
 ### RULES ###
@@ -26,9 +23,9 @@ BARS = ["11"]
 
 rule all:
     input: 
-        summary = expand("microexons/cap{cap}bar{bar}_microexons.tsv",cap=CAPS,bar=BARS),
-        fqc_html = expand("qc/cap{cap}bar{bar}_fastqc.html",cap=CAPS,bar=BARS),
-        fqc_zip = expand("qc/cap{cap}bar{bar}_fastqc.zip",cap=CAPS,bar=BARS),
+        summary = expand("microexons/file{id}_microexons.tsv",id=IDS),
+        fqc_html = expand("qc/file{id}_fastqc.html",id=IDS),
+        fqc_zip = expand("qc/file{id}_fastqc.zip",id=IDS),
 
 rule gen_microexons_full_summary:
     output: 
