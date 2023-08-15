@@ -1,21 +1,45 @@
 # Muex v0.0.1
 # Kamil Hepak, Earlham Institute, 2023
 # MIT License
+################
+### PREAMBLE ###
+################
+
+__author__ = "Kamil Hepak"
+
+import pathlib
 
 ##############
 ### CONFIG ###
 ##############
 
-# TODO write config
-# configfile: "config_muex.yaml"
+configfile: "config.yaml"
 
-# TODO make config variables for all filepaths that are used 2+ times
-# TODO make config variables for all parameters
+# TODO READS_DIR
+GENOME_REF_PATH = config["genome_ref_path"]
+TRANS_REF_PATH = config["transcriptome_ref_path"]
+ANNOT_PATH = config["annotation_path"]
+TRANS_DICT_PATH = config["transcript_dict_path"]
+
+MIN_SIZE = config.get("min_size","6")
+MAX_SIZE = config.get("max_size","21")
+UPFLANK = config.get("upflank","2")
+DOWNFLANK = config.get("downflank","2")
+LEEWAY = config.get("leeway","0")
+
+THREADS = config.get("threads","8")
+
+KMER_LEN = config.get("kmer_len","13")
+MAX_GAP = config.get("max_gap","2000000")
+MISMATCH_PEN = config.get("mismatch_pen","3")
+GAP_OPEN_1 = config.get("gap_open_1","3")
+GAP_OPEN_2 = config.get("gap_open_2","14")
+
+num_files = len([x for x in list(pathlib.Path("reads").iterdir()) if x.is_file()])
+IDS = [f"{x}" for x in range(num_files)]
+
 # TODO rule to aggregate all X_microexons.tsv files into big csv, like capybara does
 # TODO temp files / dirs
-
-# TODO determine range (no of files in reads/) programmatically
-IDS = [f"{x}" for x in range(1)]
 
 #############
 ### RULES ###
@@ -34,8 +58,8 @@ rule gen_microexons_full_summary:
         seqs = "info/{prefix}_microexons.fa",
         supporting_info = "info/{prefix}_supporting_info.tsv",
     params:
-        upflank = 2,
-        downflank = 2,
+        upflank = UPFLANK,
+        downflank = DOWNFLANK,
     script: "gen_summary.py"
 
 rule extract_microexon_sequences:
@@ -43,7 +67,7 @@ rule extract_microexon_sequences:
         seqs = "info/{prefix}_microexons.fa",
     input:
         positions = "info/{prefix}_microexons_u2_d2.bed",
-        reference = "refs/genome_reference.fa",
+        reference = GENOME_REF_PATH,
     shell: "bedtools getfasta -s -fi {input.reference} -fo {output.seqs} -nameOnly -bed {input.positions}"
 
 rule find_microexon_positions:
@@ -54,11 +78,11 @@ rule find_microexon_positions:
         alignment = "alignments/{prefix}_genome.bam",
         reads_with_inserts = "inserts/{prefix}_reads_with_inserts.tsv",
     params:
-        min_size = 6,
-        max_size = 21,
-        upflank = 2,
-        downflank = 2,
-        leeway = 0,
+        min_size = MIN_SIZE,
+        max_size = MAX_SIZE,
+        upflank = UPFLANK,
+        downflank = DOWNFLANK,
+        leeway = LEEWAY,
     script: "find_positions.py"
 
 rule align_to_genome:
@@ -66,15 +90,15 @@ rule align_to_genome:
         alignment = "alignments/{prefix}_genome.bam",
     input:
         subset = "subsets/{prefix}_subset_full.fq", 
-        reference = "refs/genome_reference.fa",
+        reference = GENOME_REF_PATH,
     params:
-        threads = 8,
-        G = 2000000, # TODO rename
-        B = 3,
-        O_1 = 3,
-        O_2 = 14,
-        k = 13,
-    shell: "minimap2 -t {params.threads} --cs --secondary=yes -G {params.G} -B{params.B} -O{params.O_1},{params.O_2} -k {params.k} -ax splice {input.reference} {input.subset} | samtools view -Sbo {output.alignment}"
+        threads = THREADS,
+        max_gap = MAX_GAP,
+        mismatch_pen = MISMATCH_PEN,
+        gap_open_1 = GAP_OPEN_1,
+        gap_open_2 = GAP_OPEN_2,
+        kmer_len = KMER_LEN,
+    shell: "minimap2 -t {params.threads} --cs --secondary=yes -G {params.max_gap} -B{params.mismatch_pen} -O{params.gap_open_1},{params.gap_open_2} -k {params.kmer_len} -ax splice {input.reference} {input.subset} | samtools view -Sbo {output.alignment}"
 
 rule subset_reads:
     output:
@@ -83,7 +107,7 @@ rule subset_reads:
         readnames = "inserts/{prefix}_reads_to_extract.txt",
         alignments = "alignments/{prefix}_transcriptome.bam",
     shell: # TODO split this apart into multiple rules
-        """ 
+        """set -x
         samtools view {input.alignments} | grep -Ff {input.readnames} > subsets/{wildcards.prefix}_subset_reads.sam
         samtools view -H {input.alignments} > subsets/{wildcards.prefix}_alignment_header.txt
         cat subsets/{wildcards.prefix}_alignment_header.txt subsets/{wildcards.prefix}_subset_reads.sam > subsets/{wildcards.prefix}_subset_full.sam
@@ -96,17 +120,17 @@ rule find_reads_with_inserts:
         reads_with_inserts = "inserts/{prefix}_reads_with_inserts.tsv",
     input:
         alignment = "alignments/{prefix}_transcriptome.bam",
-        transcript_dict = "refs/transcript_dict.pickle",
+        transcript_dict = TRANS_DICT_PATH,
     params:
-        min_size = 6,
-        max_size = 21,
+        min_size = MIN_SIZE,
+        max_size = MAX_SIZE,
     script: "find_inserts.py"
 
 rule gen_transcript_dict:
     output:
-        transcript_dict = "refs/transcript_dict.pickle",
+        transcript_dict = TRANS_DICT_PATH,
     input:
-        annotation = "refs/annotation.gtf",
+        annotation = ANNOT_PATH,
     script: "gen_dict.py"
 
 rule align_to_transcriptome:
@@ -114,17 +138,17 @@ rule align_to_transcriptome:
         alignment = "alignments/{prefix}_transcriptome.bam",
     input:
         reads = "trimmed/{prefix}_trimmed.fq.gz",
-        reference = "refs/transcriptome_reference.fa",
+        reference = TRANS_REF_PATH,
     params:
-        threads = 8,
-        k = 13, # TODO rename
-    shell: "minimap2 -t {params.threads} --cs --secondary=yes -k {params.k} -ax splice {input.reference} {input.reads} | samtools view -Sbo {output.alignment}"
+        threads = THREADS,
+        kmer_len = KMER_LEN,
+    shell: "minimap2 -t {params.threads} --cs --secondary=yes -k {params.kmer_len} -ax splice {input.reference} {input.reads} | samtools view -Sbo {output.alignment}"
 
 rule trim_reads:
     output: 
         trimmed = "trimmed/{prefix}_trimmed.fq.gz",
     input: 
-        reads = "reads/{prefix}.fq",
+        reads = "reads/{prefix}.fq", # TODO make optional inputs of all extension types
     shell: "trim_galore --gzip {input.reads} -o trimmed/" # TODO does this definitely gzip output files
 
 rule fastqc_reads:

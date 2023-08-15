@@ -1,0 +1,53 @@
+# NB: keep all parameters as strings even if they're integers (eg. "1" not 1)
+
+##############################
+## User-Editable Filepaths ###
+##############################
+
+### By default, filepaths are relative to the working directory in which snakemake is invoked.
+# filepath of directory containing raw reads for analysis
+reads_dir: "reads"
+# filepath of genome reference (.fa)
+genome_ref_path: "refs/genome_reference.fa"
+# filepath of transcriptome reference (.fa)
+transcriptome_ref_path: "refs/transcriptome_reference.fa"
+# filepath of annotation file (.gtf)
+annotation_path: "refs/annotation.gtf"
+# filepath of transcript dictionary (.pickle)
+transcript_dict_path: "refs/transcript_dict.pickle"
+
+###############################
+## User-Editable Parameters ###
+###############################
+
+### muex params
+
+# minimum insertion length to consider
+min_size: "6"
+# maximum insertion length to consider
+max_size: "21"
+# how many bases upstream of insertion to capture
+upstream: "2"
+# how many bases downstream of insertion to capture
+downstream: "2"
+# leeway for #TODO what exactly
+leeway: "0"
+
+### shell command params
+
+# threads for parallel execution TODO determine using envvars
+threads: "8"
+# minimap2 minimizer k-mer length (-k)
+kmer_len: "13"
+# minimap2 max reference gap (eg. intron) length (-G)
+max_gap: "2000000"
+# minimap2 mismatch penalty (-B)
+mismatch_pen: "3"
+# minimap2 gap open penalties (-O INT1[,INT2])
+gap_open_1: "3"
+gap_open_2: "14"
+
+##################
+## DO NOT EDIT ###
+##################
+#...unless you know what you're doing and have a good reason to.
