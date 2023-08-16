@@ -4,7 +4,13 @@
 ## User-Editable Filepaths ###
 ##############################
 
+# filepath of working directory
+# workdir: ""
+
+# TODO filetree diagram for workdir
+
 ### By default, filepaths are relative to the working directory in which snakemake is invoked.
+
 # filepath of directory containing raw reads for analysis
 reads_dir: "reads"
 # filepath of genome reference (.fa)
@@ -46,6 +52,9 @@ mismatch_pen: "3"
 # minimap2 gap open penalties (-O INT1[,INT2])
 gap_open_1: "3"
 gap_open_2: "14"
+# minimap2 gap extend penalties (-E INT1[,INT2])
+gap_extend_1: "2"
+gap_extend_2: "1"
 
 ##################
 ## DO NOT EDIT ###

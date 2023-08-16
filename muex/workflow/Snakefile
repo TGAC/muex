@@ -14,8 +14,8 @@ import pathlib
 ##############
 
 configfile: "config.yaml"
+# workdir: config["workdir"]
 
-# TODO READS_DIR
 GENOME_REF_PATH = config["genome_ref_path"]
 TRANS_REF_PATH = config["transcriptome_ref_path"]
 ANNOT_PATH = config["annotation_path"]
@@ -34,6 +34,8 @@ MAX_GAP = config.get("max_gap","2000000")
 MISMATCH_PEN = config.get("mismatch_pen","3")
 GAP_OPEN_1 = config.get("gap_open_1","3")
 GAP_OPEN_2 = config.get("gap_open_2","14")
+GAP_EXTEND_1 = config.get("gap_extend_1","2")
+GAP_EXTEND_2 = config.get("gap_extend_2","1")
 
 num_files = len([x for x in list(pathlib.Path("reads").iterdir()) if x.is_file()])
 IDS = [f"{x}" for x in range(num_files)]
@@ -97,8 +99,10 @@ rule align_to_genome:
         mismatch_pen = MISMATCH_PEN,
         gap_open_1 = GAP_OPEN_1,
         gap_open_2 = GAP_OPEN_2,
+        gap_extend_1 = GAP_EXTEND_1,
+        gap_extend_2 = GAP_EXTEND_2,
         kmer_len = KMER_LEN,
-    shell: "minimap2 -t {params.threads} --cs --secondary=yes -G {params.max_gap} -B{params.mismatch_pen} -O{params.gap_open_1},{params.gap_open_2} -k {params.kmer_len} -ax splice {input.reference} {input.subset} | samtools view -Sbo {output.alignment}"
+    shell: "minimap2 -t {params.threads} --cs --secondary=yes -G {params.max_gap} -B{params.mismatch_pen} -O{params.gap_open_1},{params.gap_open_2} -E{params.gap_extend_1},{params.gap_extend_2} -k {params.kmer_len} -ax splice {input.reference} {input.subset} | samtools view -Sbo {output.alignment}"
 
 rule subset_reads:
     output:
@@ -133,7 +137,7 @@ rule gen_transcript_dict:
         annotation = ANNOT_PATH,
     script: "gen_dict.py"
 
-rule align_to_transcriptome:
+rule align_to_transcriptome: 
     output:
         alignment = "alignments/{prefix}_transcriptome.bam",
     input:
