@@ -21,7 +21,8 @@ def main(indir: str, outdir: str):
 
     outpath.mkdir(parents=True, exist_ok=True)
 
-    files = sorted([x for x in list(inpath.iterdir()) if x.is_file()])
+    # Path.resolve() to get absolute path (replaces symlinks)
+    files = sorted([x.resolve() for x in list(inpath.iterdir()) if x.is_file()])
     num_files = len(files)
 
     for i in range(num_files):

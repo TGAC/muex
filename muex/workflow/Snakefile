@@ -146,13 +146,16 @@ rule align_to_transcriptome:
     params:
         threads = THREADS,
         kmer_len = KMER_LEN,
+    threads: 8
+    resources:
+        mem_mb=64000
     shell: "minimap2 -t {params.threads} --cs --secondary=yes -k {params.kmer_len} -ax splice {input.reference} {input.reads} | samtools view -Sbo {output.alignment}"
 
 rule trim_reads:
     output: 
         trimmed = "trimmed/{prefix}_trimmed.fq.gz",
     input: 
-        reads = "reads/{prefix}.fq", # TODO make optional inputs of all extension types
+        reads = "reads/{prefix}.fq.gz", # TODO make optional inputs of all extension types
     shell: "trim_galore --gzip {input.reads} -o trimmed/" # TODO does this definitely gzip output files
 
 rule fastqc_reads:
@@ -160,5 +163,5 @@ rule fastqc_reads:
         html = "qc/{prefix}_fastqc.html",
         zipfile = "qc/{prefix}_fastqc.zip",
     input:
-        reads = "reads/{prefix}.fq", # TODO extension-agnostic
+        reads = "reads/{prefix}.fq.gz", # TODO extension-agnostic
     shell: "fastqc {input.reads} -o qc/"
