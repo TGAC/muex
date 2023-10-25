@@ -86,7 +86,7 @@ def find_genomic_positions(alignment_path, out_bed_path, out_supp_info_path, str
 	print("generating output: positions .bed file")
 	bedfile = []
 	for muex_id,info in microexons.items():
-		bedfile.append(f"{info[0]}\t{info[2]-upstream_flank-1}\t{info[3]+downstream_flank}\t{muex_id}\t0\t{info[1]}\n")
+		bedfile.append(f"{info[0]}\t{int(info[2])-int(upstream_flank)-1}\t{int(info[3])+int(downstream_flank)}\t{muex_id}\t0\t{info[1]}\n")
 		# start pos altered bc BED pos is half-open 0-indexed eg [0,100) = the first 100 bases = chr1:1-100 = bases 0 to 99
 	print("writing output")
 	with open(out_bed_path,"wt") as out_fh:

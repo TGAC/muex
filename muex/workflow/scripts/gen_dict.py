@@ -1,5 +1,6 @@
 from gtfparse import read_gtf
 import pickle
+# import defopt
 
 def gen_dict(infile):
 	"""
@@ -10,7 +11,7 @@ def gen_dict(infile):
 	""" 
 	# TODO consider adding length of each exon to this dict
 	# Ingests GTF input as Pandas df
-	df = read_gtf(infile)
+	df = read_gtf(infile,result_type="pandas") # edit for gtfparse version 2.0.1
 	df = df[df["feature"] == "exon"] # keeps only exons
 
 	transcript_exons = {}
@@ -44,3 +45,4 @@ def main(in_gtf_path: str, out_filepath: str):
 	
 if __name__ == "__main__":
 	main(snakemake.input["annotation"],snakemake.output["transcript_dict"])
+	# defopt.run(main)

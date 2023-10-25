@@ -21,11 +21,11 @@ TRANS_REF_PATH = config["transcriptome_ref_path"]
 ANNOT_PATH = config["annotation_path"]
 TRANS_DICT_PATH = config["transcript_dict_path"]
 
-MIN_SIZE = config.get("min_size","6")
-MAX_SIZE = config.get("max_size","21")
-UPFLANK = config.get("upflank","2")
-DOWNFLANK = config.get("downflank","2")
-LEEWAY = config.get("leeway","0")
+MIN_SIZE = config.get("min_size",6)
+MAX_SIZE = config.get("max_size",21)
+UPFLANK = config.get("upflank",2)
+DOWNFLANK = config.get("downflank",2)
+LEEWAY = config.get("leeway",0)
 
 THREADS = config.get("threads","8")
 
@@ -38,6 +38,7 @@ GAP_EXTEND_1 = config.get("gap_extend_1","2")
 GAP_EXTEND_2 = config.get("gap_extend_2","1")
 
 num_files = len([x for x in list(pathlib.Path("reads").iterdir()) if x.is_file()])
+# print(f"found {num_files} files")
 IDS = [f"{x}" for x in range(num_files)]
 
 # TODO rule to aggregate all X_microexons.tsv files into big csv, like capybara does
@@ -62,7 +63,9 @@ rule gen_microexons_full_summary:
     params:
         upflank = UPFLANK,
         downflank = DOWNFLANK,
-    script: "gen_summary.py"
+    threads: 8
+    script:
+        "scripts/gen_summary.py"
 
 rule extract_microexon_sequences:
     output:
@@ -70,6 +73,7 @@ rule extract_microexon_sequences:
     input:
         positions = "info/{prefix}_microexons_u2_d2.bed",
         reference = GENOME_REF_PATH,
+    threads: 8
     shell: "bedtools getfasta -s -fi {input.reference} -fo {output.seqs} -nameOnly -bed {input.positions}"
 
 rule find_microexon_positions:
@@ -85,7 +89,9 @@ rule find_microexon_positions:
         upflank = UPFLANK,
         downflank = DOWNFLANK,
         leeway = LEEWAY,
-    script: "find_positions.py"
+    threads: 8
+    script:
+        "scripts/find_positions.py"
 
 rule align_to_genome:
     output:
@@ -102,6 +108,7 @@ rule align_to_genome:
         gap_extend_1 = GAP_EXTEND_1,
         gap_extend_2 = GAP_EXTEND_2,
         kmer_len = KMER_LEN,
+    threads: 8
     shell: "minimap2 -t {params.threads} --cs --secondary=yes -G {params.max_gap} -B{params.mismatch_pen} -O{params.gap_open_1},{params.gap_open_2} -E{params.gap_extend_1},{params.gap_extend_2} -k {params.kmer_len} -ax splice {input.reference} {input.subset} | samtools view -Sbo {output.alignment}"
 
 rule subset_reads:
@@ -110,6 +117,7 @@ rule subset_reads:
     input: 
         readnames = "inserts/{prefix}_reads_to_extract.txt",
         alignments = "alignments/{prefix}_transcriptome.bam",
+    threads: 8
     shell: # TODO split this apart into multiple rules
         """set -x
         samtools view {input.alignments} | grep -Ff {input.readnames} > subsets/{wildcards.prefix}_subset_reads.sam
@@ -128,14 +136,18 @@ rule find_reads_with_inserts:
     params:
         min_size = MIN_SIZE,
         max_size = MAX_SIZE,
-    script: "find_inserts.py"
+    threads: 8
+    script:
+        "scripts/find_inserts.py"
 
 rule gen_transcript_dict:
     output:
         transcript_dict = TRANS_DICT_PATH,
     input:
         annotation = ANNOT_PATH,
-    script: "gen_dict.py"
+    threads: 8
+    script:
+        "scripts/gen_dict.py"
 
 rule align_to_transcriptome: 
     output:
@@ -146,9 +158,9 @@ rule align_to_transcriptome:
     params:
         threads = THREADS,
         kmer_len = KMER_LEN,
-    threads: 8
     resources:
         mem_mb=64000
+    threads: 8
     shell: "minimap2 -t {params.threads} --cs --secondary=yes -k {params.kmer_len} -ax splice {input.reference} {input.reads} | samtools view -Sbo {output.alignment}"
 
 rule trim_reads:
@@ -156,6 +168,7 @@ rule trim_reads:
         trimmed = "trimmed/{prefix}_trimmed.fq.gz",
     input: 
         reads = "reads/{prefix}.fq.gz", # TODO make optional inputs of all extension types
+    threads: 8
     shell: "trim_galore --gzip {input.reads} -o trimmed/" # TODO does this definitely gzip output files
 
 rule fastqc_reads:
